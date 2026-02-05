@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Save, Printer, FileDown } from 'lucide-react';
+import { Plus, Trash2, Save, Printer } from 'lucide-react';
 import { handlePrintInvoice } from '../components/invoice/InvoicePrintHandler';
 import { CompanyDetails, InvoiceData } from '../components/invoice/InvoiceTemplate';
 import { generateInvoicePDF, InvoiceData as PDFInvoiceData } from '../services/PDFService';
@@ -166,7 +166,7 @@ export default function Billing() {
   const invoiceDate = new Date().toLocaleDateString('en-IN');
   const invoiceTime = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  const handleSaveBill = () => {
+  const handleSaveBill = async () => {
     if (!customerName || !customerPhone || products.length === 0) {
       alert('Please fill customer details and add at least one product');
       return;
@@ -246,7 +246,14 @@ export default function Billing() {
     // Refresh available products
     setAvailableProducts(productService.getAllProducts());
 
-    alert(`Bill saved successfully!\n\nCustomer: ${customerName}\nInvoice: ${invoiceNumber}\nAmount: ₹${grandTotal.toLocaleString()}\n\nCustomer data has been ${existingCustomers.find((c: any) => c.phone === customerPhone) ? 'updated' : 'created'} in the customer database.`);
+    // Generate PDF automatically
+    try {
+      await handleGeneratePDF();
+    } catch (error) {
+      console.error("Auto PDF Generation failed:", error);
+    }
+
+    alert(`Bill saved successfully and PDF generated!\n\nCustomer: ${customerName}\nInvoice: ${invoiceNumber}\nAmount: ₹${grandTotal.toLocaleString()}\n\nCustomer data has been ${existingCustomers.find((c: any) => c.phone === customerPhone) ? 'updated' : 'created'} in the customer database.`);
 
     // Reset form
     setProducts([]);
@@ -748,13 +755,7 @@ export default function Billing() {
               <Printer size={20} />
               PRINT BILL
             </button>
-            <button
-              onClick={handleGeneratePDF}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg transition-all hover:scale-105"
-            >
-              <FileDown size={20} />
-              PDF
-            </button>
+
           </div>
         </div>
 
