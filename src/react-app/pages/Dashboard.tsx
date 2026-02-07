@@ -117,7 +117,7 @@ export default function Dashboard() {
       const m = d.getMonth();
       const y = d.getFullYear();
       const sales = savedInvoices.filter((inv: any) => {
-        const [id, im, iy] = inv.date.split('/');
+        const [, im, iy] = inv.date.split('/');
         return Number(im) - 1 === m && Number(iy) === y;
       }).reduce((sum: number, inv: any) => sum + inv.amount, 0);
 

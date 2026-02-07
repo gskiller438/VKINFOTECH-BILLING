@@ -12,7 +12,6 @@ export interface InvoiceData {
     date: string;
     time: string;
     dueDate: string;
-    dueTime: string;
     paymentMode: string;
     customerName: string;
     customerAddress: string;

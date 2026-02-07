@@ -442,7 +442,6 @@ export default function Stock() {
       'Unit': p.unit,
       'Price': p.price,
       'Stock Value': p.stock * p.price,
-      'GST %': p.gst,
       'Status': p.status,
       'Stock Status': p.stock === 0 ? 'Out of Stock' : p.stock <= p.minStock ? 'Low Stock' : 'Available'
     })));

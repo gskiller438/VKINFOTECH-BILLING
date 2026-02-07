@@ -314,7 +314,6 @@ export default function Billing() {
       date: invoiceDate,
       time: invoiceTime,
       dueDate: dueDate || '-',
-      dueTime: dueTime || '-',
       paymentMode,
       customerName,
       customerPhone,
