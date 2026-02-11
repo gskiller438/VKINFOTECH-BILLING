@@ -18,9 +18,14 @@ import {
   Check,
   FileSpreadsheet,
   BarChart3,
-  Clock
+  Clock,
+  Download,
+  Layers
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import InvoiceTemplate from '../components/invoice/InvoiceTemplate';
+import { generateInvoicePDF } from '../components/invoice/InvoicePrintHandler';
+import { CompanyDetails, InvoiceData } from '../types';
 
 interface Customer {
   id: string;
@@ -28,6 +33,7 @@ interface Customer {
   phone: string;
   address: string;
   email: string;
+  gstin?: string;
   customerType: 'Retail' | 'Wholesale';
   status: 'Active' | 'Inactive';
   totalPurchases: number;
@@ -47,8 +53,58 @@ interface Invoice {
   balance: number;
   paymentMode: string;
   customerName?: string;
+  customerPhone?: string; // Added for better linking
   dueDate?: string;
+  products?: any[]; // Added to support full invoice view
+  time?: string; // Added
 }
+
+const numberToWords = (num: number): string => {
+  const a = ['', 'one ', 'two ', 'three ', 'four ', 'five ', 'six ', 'seven ', 'eight ', 'nine ', 'ten ', 'eleven ', 'twelve ', 'thirteen ', 'fourteen ', 'fifteen ', 'sixteen ', 'seventeen ', 'eighteen ', 'nineteen '];
+  const b = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+  if ((num = num.toString().length > 9 ? parseFloat(num.toString().substring(0, 9)) : num) === 0) return 'zero';
+  const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return '';
+  let str = '';
+  str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'crore ' : '';
+  str += (Number(n[2]) !== 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'lakh ' : '';
+  str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'thousand ' : '';
+  str += (Number(n[4]) !== 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'hundred ' : '';
+  str += (Number(n[5]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+  return str.trim();
+};
+
+const mapInvoiceToPrintData = (invoice: Invoice, customer: Customer, companyDetails: CompanyDetails): InvoiceData => {
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    date: invoice.date,
+    time: invoice.time || '10:00 AM', // Fallback
+    dueDate: invoice.dueDate || '-',
+    paymentMode: invoice.paymentMode,
+    customerName: customer.name,
+    customerPhone: customer.phone,
+    customerAddress: customer.address,
+    products: (invoice.products || []).map((p: any, index: number) => ({
+      sNo: index + 1,
+      description: p.name || p.description,
+      qty: p.quantity || p.qty,
+      rate: p.price || p.rate,
+      discountPercent: p.discount || p.discountPercent || 0,
+      amount: p.amount
+    })),
+    subTotal: invoice.amount, // Approximate
+    gstRate: 0,
+    totalGst: 0,
+    sgst: 0,
+    cgst: 0,
+    roundOff: 0,
+    grandTotal: invoice.amount,
+    paidAmount: invoice.paidAmount,
+    balance: invoice.balance,
+    amountInWords: numberToWords(invoice.amount)
+  };
+};
 
 export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -83,12 +139,114 @@ export default function Customers() {
   const [isUpdateSuccess, setIsUpdateSuccess] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
+  // Debugging
+  useEffect(() => {
+    console.log("Customers Component Rendered. Total Customers:", customers.length);
+  }, [customers]);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+
+  // Company Details (Hardcoded for now as in Billing)
+  const companyDetails: CompanyDetails = {
+    name: 'VK INFO TECH',
+    tagline: 'Complete Technology Solution Provider',
+    address: '123 Tech Street, Digital City', // Update with real address
+    mobile: '+91 9876543210',
+    email: 'vkinfotech.vk@gmail.com',
+    gstin: '33AAAAA0000A1Z5',
+    bankName: 'HDFC Bank',
+    accountNumber: '1234567890',
+    ifsc: 'HDFC0001234',
+    upiId: 'vkinfotech@upi',
+    logo: '/invoice-logo.png'
+  };
+
+  const handleDownloadPDF = async (invoice: Invoice, customer: Customer) => {
+    setDownloadingInvoiceId(invoice.id);
+    // Determine data to render
+    const printData = mapInvoiceToPrintData(invoice, customer, companyDetails);
+
+    // Set rendering state
+    setRenderedInvoiceData(printData);
+
+    // Allow React to render the hidden invoice
+    setTimeout(async () => {
+      try {
+        const targetElement = document.getElementById('hidden-invoice-renderer');
+        if (targetElement) {
+          await generateInvoicePDF(companyDetails, printData, { targetElement });
+        }
+      } catch (err) {
+        console.error("Download failed", err);
+        alert("Failed to download PDF");
+      } finally {
+        setDownloadingInvoiceId(null);
+        setRenderedInvoiceData(null);
+      }
+    }, 500); // Wait for render
+  };
+
+  const handleDownloadAllPDF = (customer: Customer, invoices: Invoice[]) => {
+    if (invoices.length === 0) return;
+    setIsBatchDownloading(true);
+    setBatchProgress({ current: 0, total: invoices.length });
+
+    // 1. Sort invoices
+    const sortedInvoices = [...invoices].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 2. Prepare all data at once
+    const allPrintData = sortedInvoices.map(inv => mapInvoiceToPrintData(inv, customer, companyDetails));
+
+    // 3. Trigger Render
+    setRenderedInvoiceData(allPrintData);
+
+    // 4. Wait for render, then capture all
+    setTimeout(async () => {
+      try {
+        let pdfInstance: any = null;
+
+        for (let i = 0; i < allPrintData.length; i++) {
+          const targetId = `invoice-batch-${i}`;
+          const targetElement = document.getElementById(targetId);
+
+          if (targetElement) {
+            // Generate PDF page
+            const newPdf = await generateInvoicePDF(companyDetails, allPrintData[i], {
+              targetElement,
+              save: false,
+              pdfInstance: pdfInstance
+            });
+            pdfInstance = newPdf;
+            setBatchProgress(prev => ({ ...prev, current: i + 1 }));
+          }
+        }
+
+        // Save final PDF
+        if (pdfInstance) {
+          pdfInstance.save(`${customer.name.replace(/\s+/g, '_')}_All_Invoices.pdf`);
+        }
+
+      } catch (err) {
+        console.error("Batch download failed", err);
+        alert("Failed to download all bills. Please try again.");
+      } finally {
+        setIsBatchDownloading(false);
+        setRenderedInvoiceData(null);
+      }
+    }, 1000); // 1s wait for all DOM nodes to be ready
+  };
+
+  const [renderedInvoiceData, setRenderedInvoiceData] = useState<InvoiceData | InvoiceData[] | null>(null);
+
+  // Removed old sequential effect logic
 
   const [customerForm, setCustomerForm] = useState({
     name: '',
-    phone: '',
+    phone: '+91 ',
     address: '',
     email: '',
+    gstin: '',
     customerType: 'Retail' as 'Retail' | 'Wholesale',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -132,6 +290,7 @@ export default function Customers() {
       phone: customerForm.phone,
       address: customerForm.address,
       email: customerForm.email,
+      gstin: customerForm.gstin,
       customerType: customerForm.customerType,
       status: customerForm.status,
       totalPurchases: 0,
@@ -148,9 +307,10 @@ export default function Customers() {
     setShowAddModal(false);
     setCustomerForm({
       name: '',
-      phone: '',
+      phone: '+91 ',
       address: '',
       email: '',
+      gstin: '',
       customerType: 'Retail',
       status: 'Active'
     });
@@ -177,6 +337,7 @@ export default function Customers() {
           phone: customerForm.phone,
           address: customerForm.address,
           email: customerForm.email,
+          gstin: customerForm.gstin,
           customerType: customerForm.customerType,
           status: customerForm.status,
           updatedAt: new Date().toISOString().split('T')[0]
@@ -240,7 +401,12 @@ export default function Customers() {
   };
 
   const handleViewHistory = (customer: Customer) => {
-    const invoices = customerInvoices.filter(inv => inv.customerId === customer.id);
+    // Robust filtering: valid if customerId matches OR phone matches
+    const invoices = customerInvoices.filter(inv =>
+      inv.customerId === customer.id ||
+      (inv.customerPhone && inv.customerPhone === customer.phone) ||
+      (!inv.customerId && inv.customerName === customer.name) // Fallback for very old data
+    );
     setSelectedCustomerInvoices(invoices);
     setSelectedCustomer(customer);
     setShowHistoryModal(true);
@@ -253,6 +419,7 @@ export default function Customers() {
       phone: customer.phone,
       address: customer.address,
       email: customer.email,
+      gstin: customer.gstin || '',
       customerType: customer.customerType,
       status: customer.status
     });
@@ -301,16 +468,26 @@ export default function Customers() {
       'Phone': c.phone,
       'Address': c.address,
       'Email': c.email,
+      'GSTIN': c.gstin || '-',
       'Type': c.customerType,
       'Status': c.status,
       'Total Purchases': c.totalPurchases,
+      'Latest Invoice': (() => {
+        const myInvoices = customerInvoices.filter(inv =>
+          inv.customerId === c.id ||
+          (inv.customerPhone && inv.customerPhone === c.phone) ||
+          (!inv.customerId && inv.customerName === c.name)
+        );
+        const lastInvoice = [...myInvoices].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        return lastInvoice ? lastInvoice.invoiceNumber : '-';
+      })(),
       'Total Orders': c.totalOrders,
       'Last Purchase': c.lastPurchaseDate
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Customers");
 
-    const filename = `VKINFOTECHDETAILS_${rangeLabel}.xlsx`;
+    const filename = `VK_INFOTECH_DETAILS_${rangeLabel}.xlsx`;
     XLSX.writeFile(wb, filename);
     setShowExportModal(false);
   };
@@ -445,6 +622,8 @@ export default function Customers() {
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Customer ID</th>
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Name</th>
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Contact</th>
+                <th className="text-left py-4 px-4 text-gray-600 font-semibold">GSTIN</th>
+                <th className="text-left py-4 px-4 text-gray-600 font-semibold">Last Invoice</th>
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Total Purchase</th>
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Paid Amount</th>
                 <th className="text-left py-4 px-4 text-gray-600 font-semibold">Orders</th>
@@ -463,7 +642,11 @@ export default function Customers() {
               ) : (
                 filteredCustomers.map((customer) => {
                   // Derive details from invoices
-                  const myInvoices = customerInvoices.filter(inv => inv.customerId === customer.id || inv.customerName === customer.name); // Fallback to name if ID mapping fails
+                  const myInvoices = customerInvoices.filter(inv =>
+                    inv.customerId === customer.id ||
+                    (inv.customerPhone && inv.customerPhone === customer.phone) ||
+                    (!inv.customerId && inv.customerName === customer.name)
+                  );
 
                   // Payment Mode (Last used)
                   const lastInvoice = [...myInvoices].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
@@ -486,6 +669,18 @@ export default function Customers() {
                       <td className="py-3 px-4">
                         <div className="text-gray-800 font-medium">{customer.phone}</div>
                         {customer.address && <div className="text-gray-500 text-xs mt-0.5 truncat max-w-[150px]">{customer.address}</div>}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600 text-sm">
+                        {customer.gstin || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded text-xs">
+                          {(() => {
+                            // Find latest invoice
+                            const latestInv = [...myInvoices].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                            return latestInv ? latestInv.invoiceNumber : '-';
+                          })()}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-gray-800 font-bold">₹{customer.totalPurchases.toLocaleString()}</div>
@@ -522,7 +717,7 @@ export default function Customers() {
                           className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center gap-1"
                         >
                           <FileSpreadsheet size={14} />
-                          View Bill
+                          View Bills
                         </button>
                         <button
                           onClick={() => openEditModal(customer)}
@@ -629,6 +824,18 @@ export default function Customers() {
               </div>
 
               <div>
+                <label className="block text-gray-700 text-sm mb-2 font-medium">GSTIN (Optional)</label>
+                <input
+                  type="text"
+                  value={customerForm.gstin}
+                  onChange={(e) => setCustomerForm({ ...customerForm, gstin: e.target.value.toUpperCase() })}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 uppercase"
+                  placeholder="GSTIN Number"
+                  maxLength={15}
+                />
+              </div>
+
+              <div>
                 <label className="block text-gray-700 text-sm mb-2 font-medium">Address</label>
                 <textarea
                   value={customerForm.address}
@@ -729,6 +936,18 @@ export default function Customers() {
                   onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
                   className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                   placeholder="customer@email.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm mb-2 font-medium">GSTIN (Optional)</label>
+                <input
+                  type="text"
+                  value={customerForm.gstin}
+                  onChange={(e) => setCustomerForm({ ...customerForm, gstin: e.target.value.toUpperCase() })}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 uppercase"
+                  placeholder="GSTIN Number"
+                  maxLength={15}
                 />
               </div>
 
@@ -860,7 +1079,28 @@ export default function Customers() {
               </div>
 
               {/* Invoice History */}
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Invoice History</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Invoice History</h3>
+                <button
+                  onClick={() => selectedCustomer && handleDownloadAllPDF(selectedCustomer, selectedCustomerInvoices)}
+                  disabled={isBatchDownloading || selectedCustomerInvoices.length === 0}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-white transition-all
+                     ${isBatchDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:scale-105'}
+                   `}
+                >
+                  {isBatchDownloading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Processing {batchProgress.current}/{batchProgress.total}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Layers size={18} />
+                      <span>Download All Bills</span>
+                    </>
+                  )}
+                </button>
+              </div>
               {selectedCustomerInvoices.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No purchase history found
@@ -876,6 +1116,7 @@ export default function Customers() {
                         <th className="text-left py-3 px-3 text-gray-600 font-bold">Paid</th>
                         <th className="text-left py-3 px-3 text-gray-600 font-bold">Balance</th>
                         <th className="text-left py-3 px-3 text-gray-600 font-bold">Payment Mode</th>
+                        <th className="text-center py-3 px-3 text-gray-600 font-bold">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -891,6 +1132,20 @@ export default function Customers() {
                             </span>
                           </td>
                           <td className="py-3 px-3 text-gray-600">{invoice.paymentMode}</td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => selectedCustomer && handleDownloadPDF(invoice, selectedCustomer)}
+                              disabled={downloadingInvoiceId === invoice.id || isBatchDownloading}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Download PDF"
+                            >
+                              {downloadingInvoiceId === invoice.id ? (
+                                <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></div>
+                              ) : (
+                                <Download size={18} />
+                              )}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1030,6 +1285,24 @@ export default function Customers() {
           </div>
         </div>
       )}
+
+      {/* Hidden Invoice Renderer for PDF Generation */}
+      {/* Hidden Invoice Renderer for PDF Generation */}
+      <div id="hidden-invoice-renderer" style={{ position: 'fixed', top: -10000, left: -10000, pointerEvents: 'none' }}>
+        {renderedInvoiceData && (
+          Array.isArray(renderedInvoiceData) ? (
+            renderedInvoiceData.map((data, index) => (
+              <div key={index} id={`invoice-batch-${index}`} className="mb-8">
+                <InvoiceTemplate company={companyDetails} data={data} />
+              </div>
+            ))
+          ) : (
+            <div id="invoice">
+              <InvoiceTemplate company={companyDetails} data={renderedInvoiceData} />
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }

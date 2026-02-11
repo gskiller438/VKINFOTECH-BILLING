@@ -2,10 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom Company Name Font */
+@font-face {
+  font-family: 'CompanyFont';
+  src: url('/company-name-font.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer utilities {
   .print-color-adjust {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .company-name-font {
+    font-family: 'CompanyFont', Inter, system-ui, sans-serif;
   }
 }
 

@@ -31,6 +31,9 @@ interface Product {
   minStock: number;
   unit: string;
   status: 'Active' | 'Inactive';
+  serialNumber?: string;
+  model?: string;
+  warranty?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,13 +64,16 @@ export default function Products() {
     stock: '',
     minStock: '',
     unit: 'pcs',
-    status: 'Active' as 'Active' | 'Inactive'
+    status: 'Active' as 'Active' | 'Inactive',
+    serialNumber: '',
+    model: '',
+    warranty: ''
   });
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
 
-  const categories = ['Electronics', 'Mobile', 'Computers', 'Audio', 'Accessories'];
+  const categories = ['CCTV Access', 'Laptop', 'PC', 'Accessories'];
   const brands = ['Samsung', 'Apple', 'HP', 'Sony', 'Dell', 'LG', 'Lenovo', 'OnePlus'];
-  const units = ['pcs', 'kg', 'box', 'ltr'];
+  const units = ['pcs', 'box'];
 
   const getStockStatus = (stock: number, minStock: number) => {
     if (stock === 0) return { label: 'Out of Stock', color: 'text-red-400', bg: 'bg-red-500/20', icon: XCircle };
@@ -97,7 +103,10 @@ export default function Products() {
       stock: '',
       minStock: '',
       unit: 'pcs',
-      status: 'Active'
+      status: 'Active',
+      serialNumber: '',
+      model: '',
+      warranty: ''
     });
     setFormErrors({});
     setShowAddModal(true);
@@ -114,7 +123,10 @@ export default function Products() {
       stock: product.stock.toString(),
       minStock: product.minStock.toString(),
       unit: product.unit,
-      status: product.status
+      status: product.status,
+      serialNumber: product.serialNumber || '',
+      model: product.model || '',
+      warranty: product.warranty || ''
     });
     setFormErrors({});
     setShowAddModal(true);
@@ -187,6 +199,9 @@ export default function Products() {
         minStock: parseInt(formData.minStock),
         unit: formData.unit,
         status: formData.status as 'Active' | 'Inactive',
+        serialNumber: formData.serialNumber,
+        model: formData.model,
+        warranty: formData.warranty,
         updatedAt: new Date().toISOString().split('T')[0]
       });
       alert('Product updated successfully');
@@ -202,6 +217,9 @@ export default function Products() {
         minStock: parseInt(formData.minStock),
         unit: formData.unit,
         status: formData.status as 'Active' | 'Inactive',
+        serialNumber: formData.serialNumber,
+        model: formData.model,
+        warranty: formData.warranty,
         createdAt: new Date().toISOString().split('T')[0],
         updatedAt: new Date().toISOString().split('T')[0]
       });
@@ -210,12 +228,6 @@ export default function Products() {
 
       // Success Animation
       setIsAddSuccess(true);
-
-      // Close modal after delay
-      setTimeout(() => {
-        setIsAddSuccess(false);
-        setShowAddModal(false);
-      }, 1500);
       return;
     }
 
@@ -277,7 +289,7 @@ export default function Products() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Products");
 
-    const filename = `VKINFOTECHPRODUCTS_${rangeLabel}.xlsx`;
+    const filename = `VK_INFOTECH_PRODUCTS_${rangeLabel}.xlsx`;
     XLSX.writeFile(wb, filename);
     setShowExportModal(false);
   };
@@ -532,9 +544,18 @@ export default function Products() {
                 <h3 className="text-3xl font-black text-green-600 uppercase tracking-widest animate-pulse mb-2">
                   {editingProduct ? 'Updated!' : 'Added!'}
                 </h3>
-                <p className="text-gray-500 font-medium">
+                <p className="text-gray-500 font-medium mb-6">
                   Product successfully {editingProduct ? 'updated' : 'added'} to inventory.
                 </p>
+                <button
+                  onClick={() => {
+                    setIsAddSuccess(false);
+                    setShowAddModal(false);
+                  }}
+                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-lg transition-all hover:scale-105"
+                >
+                  OK
+                </button>
               </div>
             ) : (
               <div className="p-6 space-y-6">
@@ -626,6 +647,43 @@ export default function Products() {
                         }}
                         className={`w-full px-4 py-2 bg-gray-50 border rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${formErrors.price ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300'}`}
                         placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Extended Details */}
+                <div>
+                  <h3 className="text-lg font-bold text-green-600 mb-4">Extended Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-600 text-sm mb-2">Serial Number</label>
+                      <input
+                        type="text"
+                        value={formData.serialNumber || ''}
+                        onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 text-sm mb-2">Model Number</label>
+                      <input
+                        type="text"
+                        value={formData.model || ''}
+                        onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 text-sm mb-2">Warranty Period</label>
+                      <input
+                        type="text"
+                        value={formData.warranty || ''}
+                        onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="e.g. 1 Year"
                       />
                     </div>
                   </div>

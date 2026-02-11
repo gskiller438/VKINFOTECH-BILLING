@@ -11,12 +11,12 @@ class AuthService {
 
     login(username: string, password: string): User | null {
         // Hardcoded credentials for MVP
-        if (username === 'VKINFOTECH' && password === 'VKINFOTECH123') {
-            const user: User = { id: '1', username: 'VKINFOTECH', role: 'admin', name: 'Administrator' };
+        if (username === 'VK INFOTECH' && password === 'VKINFOTECH123') {
+            const user: User = { id: '1', username: 'VK INFOTECH', role: 'admin', name: 'Administrator' };
             localStorage.setItem(this.USER_KEY, JSON.stringify(user));
             return user;
         }
-        if (username === 'VK INFOTECHSTAFF' && password === 'VKINFOTECHSTAFF123') {
+        if (username === 'VK INFOTECH STAFF' && password === 'VKINFOTECHSTAFF123') {
             const user: User = { id: '2', username: 'VK INFOTECHSTAFF', role: 'staff', name: 'Staff Member' };
             localStorage.setItem(this.USER_KEY, JSON.stringify(user));
             return user;

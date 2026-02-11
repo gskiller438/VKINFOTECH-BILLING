@@ -4,10 +4,10 @@ import { CompanyDetails, InvoiceData } from '../../types';
  * Prepares a wrapper containing cloned visible invoice pages for printing or PDF.
  * Strategy: Capture the ALREADY RENDERED React output to ensure WYSIWYG fidelity.
  */
-const prepareVisibleInvoiceDOM = (): HTMLElement => {
+const prepareVisibleInvoiceDOM = (rootElement?: HTMLElement): HTMLElement => {
     // 1. Find the main anchor element (Page 1)
-    const originalInvoice = document.getElementById('invoice');
-    if (!originalInvoice) throw new Error('Invoice visible template (#invoice) not found in DOM');
+    const originalInvoice = rootElement || document.getElementById('invoice');
+    if (!originalInvoice) throw new Error('Invoice visible template not found in DOM');
 
     const wrapper = document.createElement('div');
     wrapper.className = 'invoice-print-wrapper';
@@ -89,7 +89,7 @@ export const handlePrintInvoice = (_company: CompanyDetails, _data: InvoiceData)
     window.print();
 };
 
-export const generateInvoicePDF = async (_company: CompanyDetails, data: InvoiceData) => {
+export const generateInvoicePDF = async (_company: CompanyDetails, data: InvoiceData, options?: { targetElement?: HTMLElement, save?: boolean, pdfInstance?: any }) => {
     // Import dependencies directly
     // @ts-ignore
     const html2canvas = (await import('html2canvas')).default;
@@ -98,7 +98,7 @@ export const generateInvoicePDF = async (_company: CompanyDetails, data: Invoice
 
     let pagedDOM: HTMLElement;
     try {
-        pagedDOM = prepareVisibleInvoiceDOM();
+        pagedDOM = prepareVisibleInvoiceDOM(options?.targetElement);
     } catch (e) {
         alert("Could not prepare invoice for PDF: " + e);
         return;
@@ -130,7 +130,8 @@ export const generateInvoicePDF = async (_company: CompanyDetails, data: Invoice
         // Safety delay
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        // Create or use existing PDF instance
+        const pdf = options?.pdfInstance || new jsPDF('p', 'mm', 'a4');
         const pdfWidth = 210;
 
         // Select the cloned pages
@@ -154,11 +155,15 @@ export const generateInvoicePDF = async (_company: CompanyDetails, data: Invoice
             const imgData = canvas.toDataURL('image/png');
             const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-            if (i > 0) pdf.addPage();
+            if (i > 0 || (options?.pdfInstance && true)) pdf.addPage();
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
         }
 
-        pdf.save(`${data.customerName ? data.customerName.trim() : `Invoice_${data.invoiceNumber}`}.pdf`);
+        if (options?.save !== false) {
+            pdf.save(`${data.customerName ? data.customerName.trim() : `Invoice_${data.invoiceNumber}`}.pdf`);
+        }
+
+        return pdf;
 
     } catch (error) {
         console.error("PDF Generation Error:", error);

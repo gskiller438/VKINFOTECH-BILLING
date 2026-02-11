@@ -47,6 +47,7 @@ export interface CompanyDetails {
     qrCode?: string;
     bankHolder?: string;
     logo?: string;
+    signature?: string;
 }
 
 export interface Invoice {

@@ -89,7 +89,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
               <div className="flex flex-col animate-in fade-in slide-in-from-left duration-500">
-                <h1 className="text-2xl font-bold text-green-400 bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent">VK INFO TECH</h1>
+                <h1 className="text-2xl font-bold text-green-400 bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent company-name-font">VK INFO TECH</h1>
               </div>
             )}
             <button
@@ -100,7 +100,7 @@ export default function Layout({ children }: LayoutProps) {
             </button>
           </div>
           {sidebarOpen && (
-            <p className="text-xs text-gray-400 mt-1 animate-in fade-in slide-in-from-bottom duration-700">Billing & Inventory System</p>
+            <p className="text-xs text-gray-400 mt-1 animate-in fade-in slide-in-from-bottom duration-700 company-name-font">Billing & Inventory System</p>
           )}
         </div>
 
@@ -122,7 +122,7 @@ export default function Layout({ children }: LayoutProps) {
                 }}
               >
                 <Icon size={20} className={isActive ? 'drop-shadow-lg' : ''} />
-                {sidebarOpen && <span className="font-medium">{item.label}</span>}
+                {sidebarOpen && <span className="font-medium company-name-font">{item.label}</span>}
               </Link>
             );
           })}
@@ -135,7 +135,7 @@ export default function Layout({ children }: LayoutProps) {
             className="flex items-center gap-3 px-4 py-3 w-full text-gray-300 hover:bg-red-600 hover:text-white rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-red-500/50"
           >
             <LogOut size={20} className="hover:rotate-12 transition-transform duration-300" />
-            {sidebarOpen && <span className="font-medium">Logout</span>}
+            {sidebarOpen && <span className="font-medium company-name-font">Logout</span>}
           </button>
         </div>
       </aside>
@@ -153,7 +153,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="w-14 h-14 rounded-full p-2 flex items-center justify-center">
                 <img src="/vk-logo.png" alt="VK Logo" className="w-full h-full object-contain" />
               </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent">VKINFOTECH</h1>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent company-name-font">VK INFOTECH</h1>
             </div>
 
             {/* Right Side - Profile */}

@@ -72,6 +72,20 @@ export default function Stock() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState(false);
 
+  // Custom Notice State
+  const [showNotice, setShowNotice] = useState(false);
+  const [noticeConfig, setNoticeConfig] = useState({
+    title: '',
+    message: '',
+    type: 'success' as 'success' | 'error' | 'confirm',
+    onConfirm: (() => { }) as (() => void)
+  });
+
+  const triggerNotice = (title: string, message: string, type: 'success' | 'error' | 'confirm' = 'success', onConfirm?: () => void) => {
+    setNoticeConfig({ title, message, type, onConfirm: onConfirm || (() => { }) });
+    setShowNotice(true);
+  };
+
   const [updateForm, setUpdateForm] = useState({
     updateType: 'IN' as 'IN' | 'OUT',
     quantity: '',
@@ -79,7 +93,7 @@ export default function Stock() {
     remarks: ''
   });
 
-  const categories = ['Electronics', 'Mobile', 'Computers', 'Audio', 'Accessories'];
+  const categories = ['CCTV Access', 'Laptop', 'PC', 'Accessories'];
   const brands = ['Samsung', 'Apple', 'HP', 'Sony', 'Dell', 'LG', 'Lenovo', 'OnePlus'];
   const reasons = {
     IN: ['Purchase', 'Return', 'Adjustment'],
@@ -232,7 +246,7 @@ export default function Stock() {
 
     const quantity = parseInt(updateForm.quantity);
     if (quantity <= 0) {
-      alert('Quantity must be greater than 0');
+      triggerNotice('Invalid Quantity', 'Quantity must be greater than 0', 'error');
       return;
     }
     // Check negative stock
@@ -242,7 +256,7 @@ export default function Stock() {
       : oldStock - quantity;
 
     if (newStock < 0) {
-      alert('Cannot decrease stock below 0');
+      triggerNotice('Invalid Stock', 'Cannot decrease stock below 0', 'error');
       return;
     }
 
@@ -310,46 +324,47 @@ export default function Stock() {
     const trend = usageTrends.find(t => t.productId === productId);
 
     if (!product || !trend) {
-      alert('Unable to calculate reorder quantity');
+      triggerNotice('Error', 'Unable to calculate reorder quantity', 'error');
       return;
     }
 
-    const confirmed = confirm(
+    triggerNotice(
+      'Confirm Auto-Reorder',
       `Auto-reorder for ${product.name}?\n\n` +
       `Current Stock: ${product.stock} ${product.unit}\n` +
       `Avg Daily Usage: ${trend.avgDailyUsage.toFixed(1)} ${product.unit}\n` +
       `Suggested Reorder: ${trend.reorderSuggestion} ${product.unit}\n\n` +
-      `This will add ${trend.reorderSuggestion} ${product.unit} to your stock.`
+      `This will add ${trend.reorderSuggestion} ${product.unit} to your stock.`,
+      'confirm',
+      () => {
+        // Simulate reorder
+        const oldStock = product.stock;
+        const newStock = oldStock + trend.reorderSuggestion;
+
+        setProducts(products.map(p =>
+          p.id === productId
+            ? { ...p, stock: newStock, updatedAt: new Date().toLocaleString('en-IN') }
+            : p
+        ));
+
+        const newLog: StockLog = {
+          id: `L${(stockLogs.length + 1).toString().padStart(3, '0')}`,
+          productId: product.id,
+          productName: product.name,
+          oldStock,
+          newStock,
+          changeType: 'IN',
+          quantity: trend.reorderSuggestion,
+          reason: 'Purchase',
+          remarks: 'Auto-reorder based on usage analysis',
+          updatedBy: 'System',
+          dateTime: new Date().toLocaleString('en-IN')
+        };
+        setStockLogs([newLog, ...stockLogs]);
+
+        triggerNotice('Success', 'Auto-reorder completed successfully!', 'success');
+      }
     );
-
-    if (confirmed) {
-      // Simulate reorder
-      const oldStock = product.stock;
-      const newStock = oldStock + trend.reorderSuggestion;
-
-      setProducts(products.map(p =>
-        p.id === productId
-          ? { ...p, stock: newStock, updatedAt: new Date().toLocaleString('en-IN') }
-          : p
-      ));
-
-      const newLog: StockLog = {
-        id: `L${(stockLogs.length + 1).toString().padStart(3, '0')}`,
-        productId: product.id,
-        productName: product.name,
-        oldStock,
-        newStock,
-        changeType: 'IN',
-        quantity: trend.reorderSuggestion,
-        reason: 'Purchase',
-        remarks: 'Auto-reorder based on usage analysis',
-        updatedBy: 'System',
-        dateTime: new Date().toLocaleString('en-IN')
-      };
-      setStockLogs([newLog, ...stockLogs]);
-
-      alert('Auto-reorder completed successfully!');
-    }
   };
 
 
@@ -482,7 +497,7 @@ export default function Stock() {
     const wsCategory = XLSX.utils.json_to_sheet(categoryData);
     XLSX.utils.book_append_sheet(wb, wsCategory, "Category Analysis");
 
-    const filename = `VKINFOTECHSTOCKS_${rangeLabel.replace(/\s+/g, '_')}.xlsx`;
+    const filename = `VK_INFOTECH_STOCKS_${rangeLabel.replace(/\s+/g, '_')}.xlsx`;
     XLSX.writeFile(wb, filename);
     setShowExportModal(false);
   };
@@ -1245,6 +1260,76 @@ export default function Stock() {
                   <span className="absolute top-0 left-[-100%] w-full h-full bg-white/20 skew-x-[45deg] group-hover:animate-[shimmer_1s_infinite]"></span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Notice Modal (White Box Animation) */}
+      {showNotice && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl shadow-2xl w-[450px] overflow-hidden transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 border-4 border-white">
+            {/* Header / Icon Section */}
+            <div className={`h-32 flex items-center justify-center relative overflow-hidden ${noticeConfig.type === 'success' ? 'bg-green-500' :
+                noticeConfig.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+              }`}>
+              {/* Background Shapes for Animation */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute -top-10 -left-10 w-40 h-40 bg-white rounded-full animate-pulse"></div>
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white rounded-full animate-pulse delay-700"></div>
+              </div>
+
+              <div className="relative z-10 bg-white rounded-full p-4 shadow-xl animate-bounce">
+                {noticeConfig.type === 'success' ? (
+                  <CheckCircle size={48} className="text-green-500" />
+                ) : noticeConfig.type === 'error' ? (
+                  <XCircle size={48} className="text-red-500" />
+                ) : (
+                  <Package size={48} className="text-blue-500" />
+                )}
+              </div>
+            </div>
+
+            {/* Content Section */}
+            <div className="p-8 text-center bg-white">
+              <h3 className="text-2xl font-black text-gray-800 mb-3 uppercase tracking-tight">
+                {noticeConfig.title}
+              </h3>
+              <p className="text-gray-500 font-medium leading-relaxed whitespace-pre-wrap">
+                {noticeConfig.message}
+              </p>
+            </div>
+
+            {/* Actions Section */}
+            <div className="p-6 pt-0 flex gap-3 justify-center bg-white">
+              {noticeConfig.type === 'confirm' ? (
+                <>
+                  <button
+                    onClick={() => setShowNotice(false)}
+                    className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold transition-all uppercase text-sm tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNotice(false);
+                      noticeConfig.onConfirm();
+                    }}
+                    className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all uppercase text-sm tracking-widest shadow-lg shadow-green-200"
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowNotice(false)}
+                  className={`min-w-[150px] px-8 py-3 rounded-xl font-bold transition-all uppercase text-sm tracking-widest text-white shadow-lg ${noticeConfig.type === 'success' ? 'bg-green-500 shadow-green-200' :
+                      noticeConfig.type === 'error' ? 'bg-red-500 shadow-red-200' : 'bg-blue-500 shadow-blue-200'
+                    }`}
+                >
+                  Okay
+                </button>
+              )}
             </div>
           </div>
         </div>

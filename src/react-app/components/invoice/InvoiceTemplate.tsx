@@ -46,7 +46,6 @@ export default function InvoiceTemplate({ company, data }: InvoiceTemplateProps)
 
               <div className="w-[150px] h-full flex flex-col items-end justify-start p-4 text-right">
                 <h2 className="text-xl font-bold text-[#3b82f6] tracking-widest uppercase">Invoice</h2>
-                <p className="text-[10px] font-bold text-gray-400 mt-1">Page {pageIndex + 1} of {chunks.length}</p>
               </div>
             </div>
 
@@ -190,7 +189,7 @@ export default function InvoiceTemplate({ company, data }: InvoiceTemplateProps)
                 <div className="flex border-b border-black">
                   <div className="flex-1 p-2 border-r border-black">
                     <p className="font-bold text-[10px] text-gray-500 mb-1 leading-none uppercase">Amount in Words</p>
-                    <p className="font-bold text-xs uppercase underline">{data.amountInWords} Only</p>
+                    <p className="font-bold text-xs uppercase underline">{data.amountInWords}</p>
                     <div className="mt-4">
                       <p className="font-bold text-[10px] text-gray-500 mb-1 leading-none uppercase">Terms & Conditions</p>
                       <ul className="text-[9px] list-disc pl-4 space-y-0.5 leading-tight">
@@ -229,6 +228,11 @@ export default function InvoiceTemplate({ company, data }: InvoiceTemplateProps)
                   <p className="text-[10px] font-bold border-t border-black w-full text-center pt-1">Authorized Signature</p>
                 </div>
               </div>
+            </div>
+
+            {/* Page Number - Bottom Left */}
+            <div className="absolute bottom-1 left-2 text-[9px] font-bold text-gray-400">
+              Page {pageIndex + 1} of {chunks.length}
             </div>
           </div>
         );

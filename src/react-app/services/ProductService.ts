@@ -10,6 +10,9 @@ export interface Product {
     minStock: number;
     unit: string;
     status: 'Active' | 'Inactive';
+    serialNumber?: string;
+    warranty?: string;
+    model?: string;
     createdAt: string;
     updatedAt: string;
 }

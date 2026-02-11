@@ -33,7 +33,7 @@ export default function Login() {
                     <div className="w-20 h-20 mb-4 flex items-center justify-center">
                         <img src="/vk-logo.png" alt="VK Logo" className="w-full h-full object-contain" />
                     </div>
-                    <h1 className="text-4xl font-bold mb-2 tracking-tight">VKINFOTECH</h1>
+                    <h1 className="text-4xl font-bold mb-2 tracking-tight company-name-font">VK INFOTECH</h1>
                     <p className="opacity-90 font-medium">Billing & Inventory System Login</p>
                 </div>
 
@@ -87,7 +87,7 @@ export default function Login() {
                         </button>
 
                         <div className="text-center text-xs text-gray-400 mt-4">
-                            <p>© 2026 VKINFOTECH. All rights reserved.</p>
+                            <p>© 2026 VK INFOTECH. All rights reserved.</p>
                         </div>
                     </form>
                 </div>

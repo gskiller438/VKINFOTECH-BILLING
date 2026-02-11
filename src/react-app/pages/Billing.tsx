@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Save, Printer } from 'lucide-react';
+import { Save, Trash2, Printer, Edit } from 'lucide-react';
 
 import { handlePrintInvoice, generateInvoicePDF } from '../components/invoice/InvoicePrintHandler';
 import { CompanyDetails, InvoiceData } from '../types';
@@ -42,23 +42,48 @@ export default function Billing() {
     setTimeout(() => setShowError(false), 3000);
   };
 
-  // Placeholder company details (will be loaded from database)
-  // Placeholder company details (will be loaded from database)
-  const companyDetails = {
-    name: 'VK Info TECH',
-    tagline: 'Complete Technology Solution Provider',
-    address: 'No.1, Kumaravel Complex, Koneripatti, Rasipuram, Namakkal - 637408',
-    phone: '+91 99445 51256',
-    gst: '33ABCDE1234F1Z5', // Updated placeholder GST to TN state code (33) based on address, or keep generic
-    bankName: 'KVB, Rasipuram',
-    bankHolder: 'Vasanthakumar Palanivel',
-    accountNumber: '1622155000097090',
-    ifsc: 'KVBL0001622',
-    upiId: 'vasanthakumar44551@oksbi',
-    terms: 'Goods once sold cannot be taken back or exchange.',
-  };
+  // Company Details State (Load from localStorage or use defaults)
+  const [companyDetails] = useState<CompanyDetails>(() => {
+    const savedDetails = localStorage.getItem('companySettings');
+    return savedDetails ? JSON.parse(savedDetails) : {
+      name: 'VK Info TECH',
+      tagline: 'Complete Technology Solution Provider',
+      address: 'No.1, Kumaravel Complex, Koneripatti, Rasipuram, Namakkal - 637408',
+      mobile: '+91 99445 51256',
+      gstin: '33ABCDE1234F1Z5',
+      bankName: 'KVB, Rasipuram',
+      bankHolder: 'Vasanthakumar Palanivel',
+      accountNumber: '1622155000097090',
+      ifsc: 'KVBL0001622',
+      upiId: 'vasanthakumar44551@oksbi',
+      terms: 'Goods once sold cannot be taken back or exchange.',
+      email: 'vkinfotech.vk@gmail.com',
+      logo: '/invoice-logo.png'
+    };
+  });
+
+  // Bill From Editable State
+  const [billFromName, setBillFromName] = useState(companyDetails.name);
+  const [billFromAddress, setBillFromAddress] = useState(companyDetails.address);
+  const [billFromMobile, setBillFromMobile] = useState(companyDetails.mobile);
+  const [billFromGst, setBillFromGst] = useState(''); // Manual GST for this bill
+  const [billFromExtra1, setBillFromExtra1] = useState(''); // Extra address line 1
+  const [billFromExtra2, setBillFromExtra2] = useState(''); // Extra address line 2
+
+  // Update effect to sync if companyDetails changes (though mostly static after mount)
+  useEffect(() => {
+    setBillFromName(companyDetails.name);
+    setBillFromAddress(companyDetails.address);
+    setBillFromMobile(companyDetails.mobile);
+  }, [companyDetails]);
 
   const [availableProducts, setAvailableProducts] = useState<InventoryProduct[]>([]);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+
+  // Tax State
+  const [gstRate, setGstRate] = useState(0);
+  const [sgstRate, setSgstRate] = useState(0);
+  const [cgstRate, setCgstRate] = useState(0);
 
   // Load products on mount
   useEffect(() => {
@@ -70,14 +95,41 @@ export default function Billing() {
     // setSelectedProduct(productName);
     const product = availableProducts.find(p => p.name === productName);
     if (product) {
-      setManualDescription(product.name);
+      let description = product.name;
+
+      // Append Product Description (e.g. "256GB Titanium")
+      if (product.description) {
+        description += ` (${product.description})`;
+      }
+
+      const details = [];
+      if (product.model) details.push(`Model: ${product.model}`);
+      if (product.serialNumber) details.push(`SN: ${product.serialNumber}`);
+      if (product.warranty) details.push(`Warranty: ${product.warranty}`);
+
+      if (details.length > 0) {
+        description += ` (${details.join(', ')})`;
+      }
+
+      setManualDescription(description);
       setSelectedBrand(product.brand);
       setManualPrice(product.price);
     } else {
-      setManualDescription('');
-      setSelectedBrand('');
-      setManualPrice('');
+      // Don't clear if we are just searching, but maybe we should if strictly selecting.
+      // For now, let's keep manual entry flexible.
     }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setManualDescription(product.name);
+    setQuantity(product.quantity);
+    setManualPrice(product.price);
+    setDiscount(product.discount);
+    setSelectedBrand(product.brand);
+    // Scroll to top or input area could be nice
+    descriptionRef.current?.focus();
+    triggerError('Editing Item: ' + product.name); // Using error toast as info for now
   };
 
   const addProduct = () => {
@@ -92,23 +144,36 @@ export default function Billing() {
     const discountAmount = baseAmount * (discount / 100);
     const finalAmount = baseAmount - discountAmount;
 
-    const newProduct: Product = {
-      id: Date.now().toString(),
-      name: manualDescription,
-      brand: selectedBrand || 'General', // Default brand if manual
-      price,
-      quantity,
-      discount,
-      amount: finalAmount,
-    };
+    if (editingProductId) {
+      // Update Existing Product
+      setProducts(products.map(p =>
+        p.id === editingProductId
+          ? { ...p, name: manualDescription, brand: selectedBrand || 'General', price, quantity, discount, amount: finalAmount }
+          : p
+      ));
+      setEditingProductId(null);
+      triggerError('Item Updated Successfully!');
+    } else {
+      // Add New Product
+      const newProduct: Product = {
+        id: Date.now().toString(),
+        name: manualDescription,
+        brand: selectedBrand || 'General', // Default brand if manual
+        price,
+        quantity,
+        discount,
+        amount: finalAmount,
+      };
+      setProducts([...products, newProduct]);
+    }
 
-    setProducts([...products, newProduct]);
     // Reset fields
     setManualDescription('');
     setSelectedBrand('');
     setManualPrice('');
     setQuantity(1);
     setDiscount(0);
+    setEditingProductId(null);
 
     // Auto-focus back to description for continuous entry
     setTimeout(() => {
@@ -130,11 +195,11 @@ export default function Billing() {
   // Calculations
   // Calculations
   const subtotal = products.reduce((sum, p) => sum + p.amount, 0);
-  const totalGstAmount = 0; // GST removed as per user request to simplify
-  const cgst = 0;
-  const sgst = 0;
-  const grandTotal = Math.round(subtotal);
-  const roundOff = grandTotal - subtotal;
+  const totalGstAmount = (subtotal * gstRate) / 100;
+  const sgst = (subtotal * sgstRate) / 100;
+  const cgst = (subtotal * cgstRate) / 100;
+  const grandTotal = Math.round(subtotal + totalGstAmount + sgst + cgst);
+  const roundOff = parseFloat((grandTotal - (subtotal + totalGstAmount + sgst + cgst)).toFixed(2));
   const balanceAmount = grandTotal - paidAmount;
 
   // Convert number to words
@@ -197,6 +262,53 @@ export default function Billing() {
   };
 
   const [invoiceNumber, setInvoiceNumber] = useState(generateInvoiceNumber());
+
+  // Customer Auto-Suggestion Logic
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load customers on mount
+  useEffect(() => {
+    const savedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+    setCustomers(savedCustomers);
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleCustomerNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCustomerName(value);
+
+    if (value.trim()) {
+      const filtered = customers.filter(c =>
+        c.name.toLowerCase().includes(value.toLowerCase()) ||
+        c.phone.includes(value)
+      );
+      setFilteredCustomers(filtered);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectCustomer = (customer: any) => {
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setCustomerAddress(customer.address);
+    setCustomerGst(customer.gstin || ''); // Auto-fill GSTIN if available
+    setShowSuggestions(false);
+  };
 
   // Re-generate invoice number on mount to ensure freshness (in case other tabs added invoices)
   useEffect(() => {
@@ -327,8 +439,8 @@ export default function Billing() {
         amount: p.amount
       })),
       subTotal: subtotal,
-      gstRate: 0,
-      totalGst: 0,
+      gstRate: gstRate,
+      totalGst: totalGstAmount,
       sgst: sgst,
       cgst: cgst,
       roundOff: roundOff,
@@ -370,11 +482,13 @@ export default function Billing() {
     try {
       const company: CompanyDetails = {
         ...companyDetails,
-        mobile: companyDetails.phone,
-        email: 'vkinfotech.vk@gmail.com',
-        gstin: companyDetails.gst,
-        logo: '/invoice-logo.png',
-        tagline: 'Complete Technology Solution Provider'
+        name: billFromName,
+        address: `${billFromAddress}${billFromExtra1 ? '\n' + billFromExtra1 : ''}${billFromExtra2 ? '\n' + billFromExtra2 : ''}`,
+        mobile: billFromMobile,
+        email: companyDetails.email || 'vkinfotech.vk@gmail.com',
+        gstin: billFromGst || companyDetails.gstin, // Use manual GST if provided, else default
+        logo: companyDetails.logo || '/invoice-logo.png',
+        tagline: companyDetails.tagline || 'Complete Technology Solution Provider'
       };
 
       await generateInvoicePDF(company, getInvoiceDataForPrint());
@@ -404,13 +518,16 @@ export default function Billing() {
     if (!saved) return;
 
     // 2. Print
+    // 2. Print
     const company: CompanyDetails = {
       ...companyDetails,
-      mobile: companyDetails.phone,
-      email: 'vkinfotech.vk@gmail.com',
-      gstin: companyDetails.gst,
-      logo: '/invoice-logo.png',
-      tagline: 'Complete Technology Solution Provider'
+      name: billFromName,
+      address: `${billFromAddress}${billFromExtra1 ? '\n' + billFromExtra1 : ''}${billFromExtra2 ? '\n' + billFromExtra2 : ''}`,
+      mobile: billFromMobile,
+      email: companyDetails.email || 'vkinfotech.vk@gmail.com',
+      gstin: billFromGst || companyDetails.gstin,
+      logo: companyDetails.logo || '/invoice-logo.png',
+      tagline: companyDetails.tagline || 'Complete Technology Solution Provider'
     };
 
     handlePrintInvoice(company, getInvoiceDataForPrint());
@@ -425,35 +542,28 @@ export default function Billing() {
   return (
     <div className="max-w-[210mm] mx-auto p-4 min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
 
-      {/* GLITCH ERROR OVERLAY */}
+      {/* SIMPLE ERROR MODAL */}
       {showError && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-red-600 text-white px-12 py-6 rounded-lg shadow-2xl border-4 border-black animate-pulse flex flex-col items-center gap-2 transform -skew-x-12">
-            <h2 className="text-4xl font-black italic tracking-tighter uppercase glitch-text">SYSTEM ERROR</h2>
-            <p className="text-xl font-bold uppercase">{errorMsg}</p>
-            <div className="absolute inset-0 bg-red-400 mix-blend-overlay opacity-50 animate-ping rounded-lg"></div>
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full text-center border border-red-200 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-red-600 mb-2">Notice</h3>
+            <p className="font-bold text-gray-800 mb-6">{errorMsg}</p>
+            <button
+              onClick={() => setShowError(false)}
+              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 font-bold transition-colors w-full"
+            >
+              OK, CLOSE
+            </button>
           </div>
-          <style>{`
-            @keyframes glitch {
-              0% { transform: translate(0) }
-              20% { transform: translate(-5px, 5px) }
-              40% { transform: translate(-5px, -5px) }
-              60% { transform: translate(5px, 5px) }
-              80% { transform: translate(5px, -5px) }
-              100% { transform: translate(0) }
-            }
-            .glitch-text {
-              animation: glitch 0.2s infinite;
-            }
-          `}</style>
         </div>
       )}
+
 
       {/* A4 SHEET (210mm wide) - White Background for Print */}
       <div className="flex flex-col gap-8 pb-32">
         {chunks.map((chunk, pageIndex) => {
           const isLastPage = pageIndex === chunks.length - 1;
-          const pageSubtotal = chunk.reduce((sum, p) => sum + p.amount, 0);
+          // const pageSubtotal = chunk.reduce((sum, p) => sum + p.amount, 0); // Removed as per request
 
           return (
             <div
@@ -481,33 +591,97 @@ export default function Billing() {
                   {/* INVOICE LABEL BOX */}
                   <div className="w-[150px] flex flex-col items-end justify-start p-4">
                     <h2 className="text-xl font-bold text-[#3b82f6] tracking-widest">INVOICE</h2>
-                    <p className="text-[10px] font-bold text-gray-400 mt-1">Page {pageIndex + 1} of {chunks.length}</p>
                   </div>
                 </div>
 
                 {/* INFO GRID - 3 COLUMNS */}
                 <div className="flex border-b-2 border-black h-[170px]">
-                  {/* BILL FROM - Static */}
+                  {/* BILL FROM - Editable */}
                   <div className="w-[30%] border-r border-black p-2 flex flex-col text-[11px] leading-snug">
                     <h3 className="font-bold text-sm mb-1 uppercase text-blue-800">Bill From</h3>
-                    <div className="font-bold text-xs">{companyDetails.name}</div>
-                    <div className="whitespace-pre-line">{companyDetails.address}</div>
-                    <div className="mt-1">Phone No: {companyDetails.phone}</div>
+                    <input
+                      type="text"
+                      className="font-bold text-xs outline-none bg-transparent w-full placeholder-gray-400"
+                      value={billFromName}
+                      onChange={(e) => setBillFromName(e.target.value)}
+                      placeholder="Company Name"
+                    />
+                    <textarea
+                      className="outline-none bg-transparent resize-none h-[40px] w-full overflow-hidden leading-snug placeholder-gray-400"
+                      value={billFromAddress}
+                      onChange={(e) => setBillFromAddress(e.target.value)}
+                      placeholder="Address..."
+                    />
+                    {/* Extra Lines & Manual GST */}
+                    <input
+                      type="text"
+                      className="outline-none bg-transparent w-full placeholder-gray-400"
+                      value={billFromExtra1}
+                      onChange={(e) => setBillFromExtra1(e.target.value)}
+                      placeholder="Extra Line 1 (Optional)"
+                    />
+                    <input
+                      type="text"
+                      className="outline-none bg-transparent w-full placeholder-gray-400"
+                      value={billFromExtra2}
+                      onChange={(e) => setBillFromExtra2(e.target.value)}
+                      placeholder="Extra Line 2 (Optional)"
+                    />
+                    <div className="mt-1 flex items-center gap-1">
+                      <span>Phone:</span>
+                      <input
+                        type="text"
+                        className="outline-none bg-transparent w-full"
+                        value={billFromMobile}
+                        onChange={(e) => setBillFromMobile(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>GST:</span>
+                      <input
+                        type="text"
+                        className="outline-none bg-transparent w-full uppercase"
+                        value={billFromGst}
+                        onChange={(e) => setBillFromGst(e.target.value.toUpperCase())}
+                        placeholder="GSTIN (Manual)"
+                      />
+                    </div>
                   </div>
 
                   {/* BILL TO - Editable (Only on first page or all? Standard is usually all or first. Let's keep it editable on all for user convenience if they scroll) */}
-                  <div className="w-[35%] border-r border-black p-2 flex flex-col gap-1 text-[11px] leading-snug">
+                  <div className="w-[35%] border-r border-black p-2 flex flex-col gap-1 text-[11px] leading-snug relative" ref={pageIndex === 0 ? dropdownRef : null}>
                     <h3 className="font-bold text-sm mb-1 uppercase text-blue-800">Bill To</h3>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 relative">
                       <input
                         id={`customer-name-${pageIndex}`}
                         type="text"
                         autoComplete="off"
                         value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        onChange={handleCustomerNameChange}
+                        onFocus={() => {
+                          if (customerName) setShowSuggestions(true);
+                        }}
                         className="font-bold outline-none border-b border-gray-400 bg-transparent w-full placeholder-gray-500"
                         placeholder="Customer Name"
                       />
+
+                      {/* Auto-Suggestion Dropdown (Only on first page to prevent duplicates/layout issues) */}
+                      {pageIndex === 0 && showSuggestions && filteredCustomers.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 shadow-lg z-50 max-h-32 overflow-y-auto mt-1">
+                          {filteredCustomers.map((customer) => (
+                            <div
+                              key={customer.id}
+                              className="p-1 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-0"
+                              onClick={() => handleSelectCustomer(customer)}
+                            >
+                              <div className="font-bold text-gray-800 text-xs">{customer.name}</div>
+                              <div className="text-[10px] text-gray-500 flex justify-between">
+                                <span>{customer.phone}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <textarea
                         id={`customer-address-${pageIndex}`}
                         autoComplete="off"
@@ -555,6 +729,7 @@ export default function Billing() {
                           <option value="UPI">UPI</option>
                           <option value="CASH">CASH</option>
                           <option value="CARD">CARD</option>
+                          <option value="NET BANKING">NET BANKING</option>
                         </select>
                       </div>
                       <div className="flex justify-between font-bold"><span>BALANCE</span><span>: {(Number(balanceAmount) || 0).toFixed(2)}</span></div>
@@ -581,19 +756,28 @@ export default function Billing() {
                         <div key={i} className="flex border-b border-gray-300 text-[11px] min-h-[25px] group invoice-item-row">
                           <div className="w-[8%] p-1 text-center border-r border-black flex items-center justify-center relative">
                             {globalIndex + 1}
-                            <button
-                              data-html2canvas-ignore="true"
-                              onClick={() => removeProduct(p.id)}
-                              className="absolute left-1 hidden group-hover:block text-red-500"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-white gap-2" data-html2canvas-ignore="true">
+                              <button
+                                onClick={() => handleEditProduct(p)}
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Edit Item"
+                              >
+                                <Edit size={12} />
+                              </button>
+                              <button
+                                onClick={() => removeProduct(p.id)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Remove Item"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
                           <div className="flex-1 p-1 px-2 border-r border-black font-medium flex items-center">{p.name}</div>
                           <div className="w-[10%] p-1 text-center border-r border-black flex items-center justify-center">{p.quantity}</div>
                           <div className="w-[12%] p-1 text-right border-r border-black px-2 flex items-center justify-end">{p.price}</div>
                           <div className="w-[8%] p-1 text-center border-r border-black flex items-center justify-center">{p.discount || '0'}%</div>
-                          <div className="w-[15%] p-1 text-right border-black font-bold px-2 flex items-center justify-end">{p.amount}</div>
+                          <div className="w-[15%] p-1 text-right border-black font-bold px-2 flex items-center justify-end">{p.amount.toFixed(2)}</div>
                         </div>
                       );
                     })}
@@ -673,13 +857,14 @@ export default function Billing() {
                 </div>
 
                 {/* FOOTER - UI Preservation (existing area) */}
-                <div className="mt-auto border-t-2 border-black flex flex-col">
-                  {/* Bank & Totals Table */}
-                  <div className="flex border-b border-black">
-                    <div className="w-1/2 border-r border-black p-2 bg-gray-50 flex flex-col justify-center">
+                <div className="mt-auto border-t-2 border-black flex flex-row">
+                  {/* LEFT COLUMN: Bank -> QR/UPI -> Terms */}
+                  <div className="w-1/2 border-r border-black flex flex-col">
+                    {/* Bank Details */}
+                    <div className="border-b border-black p-2 bg-gray-50">
                       <div className="bank-details-block">
                         <h3 className="font-bold text-[11px] mb-1">Bank Details</h3>
-                        <div className="grid grid-cols-[80px_1fr] text-[11px] font-medium leading-relaxed pl-1">
+                        <div className="grid grid-cols-[80px_1fr] text-[10px] font-medium leading-relaxed pl-1">
                           <span>Name</span><span>: {companyDetails.bankHolder || 'Vasanthakumar Palanivel'}</span>
                           <span>IFSC Code</span><span>: {companyDetails.ifsc}</span>
                           <span>Account No</span><span>: {companyDetails.accountNumber}</span>
@@ -688,32 +873,78 @@ export default function Billing() {
                       </div>
                     </div>
 
-                    <div className="w-1/2">
+                    {/* QR Code & UPI */}
+                    <div className="border-b border-black p-2 flex items-center gap-4">
+                      <div className="w-16 h-16 border border-black p-1 flex-shrink-0 bg-white">
+                        <img src="/payment-qr.png" alt="QR" className="w-full h-full object-contain" />
+                      </div>
+                      <div className="flex flex-col">
+                        <h4 className="font-bold text-[10px] uppercase text-blue-800 mb-0.5">Scan to Pay</h4>
+                        <div className="text-[9px] font-bold text-gray-600">UPI ID:</div>
+                        <div className="text-xs font-bold text-black border-b border-dashed border-gray-400 pb-0.5 invoice-upi-id">{companyDetails.upiId}</div>
+                      </div>
+                    </div>
+
+                    {/* Terms & Conditions - Fills remaining space in left col */}
+                    <div className="p-2 flex-1 terms-block">
+                      <div className="font-bold text-[11px] mb-1">Terms and Conditions:</div>
+                      <ul className="text-[9px] list-disc pl-4 text-black space-y-0.5 leading-tight font-medium">
+                        <li>Goods once sold cannot be taken back or exchange.</li>
+                        <li>Invoice Once made cannot be Modified or Cancelled.</li>
+                        <li>Repairs/ Replacement subject to manufacture Policy.</li>
+                        <li>Warranty void on product if Mishandled/ Burnt/ Physically.</li>
+                        <li>Credit period 2 Days only</li>
+                        <li>Subject to local jurisdiction.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* RIGHT COLUMN: Totals -> Words -> Signature */}
+                  <div className="w-1/2 flex flex-col">
+                    {/* Totals Table */}
+                    <div className="border-b border-black">
                       <table className="w-full text-xs font-bold">
                         <tbody>
-                          <tr className="h-6 border-b border-gray-100 summary-subtotal-row">
-                            <td className="px-2">Page {pageIndex + 1} Subtotal</td>
-                            <td className="px-2 text-right invoice-page-subtotal">₹{pageSubtotal.toFixed(2)}</td>
-                          </tr>
                           <tr className={`h-6 border-b border-gray-100 summary-overall-subtotal-row ${isLastPage ? '' : 'hidden'}`}>
                             <td className="px-2 font-bold">Overall Subtotal</td>
                             <td className="px-2 text-right font-bold invoice-subtotal">₹{subtotal.toFixed(2)}</td>
                           </tr>
                           <tr className={`h-6 border-b border-gray-100 summary-gst-row ${isLastPage ? '' : 'hidden'}`}>
-                            <td className="px-2">GST (18%)</td>
+                            <td className="px-2 flex items-center gap-1">
+                              GST (<input
+                                type="number"
+                                value={gstRate}
+                                onChange={(e) => setGstRate(Number(e.target.value))}
+                                className="w-8 border-b border-gray-400 text-center outline-none bg-transparent font-bold"
+                              />%)
+                            </td>
                             <td className="px-2 text-right invoice-gst">₹{totalGstAmount.toFixed(2)}</td>
                           </tr>
                           <tr className={`h-6 border-b border-gray-100 summary-sgst-row ${isLastPage ? '' : 'hidden'}`}>
-                            <td className="px-2">SGST (9%)</td>
+                            <td className="px-2 flex items-center gap-1">
+                              SGST (<input
+                                type="number"
+                                value={sgstRate}
+                                onChange={(e) => setSgstRate(Number(e.target.value))}
+                                className="w-6 border-b border-gray-400 text-center outline-none bg-transparent font-bold"
+                              />%)
+                            </td>
                             <td className="px-2 text-right invoice-sgst">₹{sgst.toFixed(2)}</td>
                           </tr>
                           <tr className={`h-6 border-b border-gray-100 summary-cgst-row ${isLastPage ? '' : 'hidden'}`}>
-                            <td className="px-2">CGST (9%)</td>
+                            <td className="px-2 flex items-center gap-1">
+                              CGST (<input
+                                type="number"
+                                value={cgstRate}
+                                onChange={(e) => setCgstRate(Number(e.target.value))}
+                                className="w-6 border-b border-gray-400 text-center outline-none bg-transparent font-bold"
+                              />%)
+                            </td>
                             <td className="px-2 text-right invoice-cgst">₹{cgst.toFixed(2)}</td>
                           </tr>
                           <tr className={`h-6 border-b border-gray-100 summary-roundoff-row ${isLastPage ? '' : 'hidden'}`}>
                             <td className="px-2">Round Off</td>
-                            <td className="px-2 text-right invoice-roundoff">₹{roundOff}</td>
+                            <td className="px-2 text-right invoice-roundoff">₹{roundOff.toFixed(2)}</td>
                           </tr>
                           <tr className={`h-8 bg-[#93c5fd] border-b border-black summary-grandtotal-row ${isLastPage ? '' : 'hidden'}`}>
                             <td className="px-2 text-sm">Grand Total</td>
@@ -734,52 +965,29 @@ export default function Billing() {
                         </tbody>
                       </table>
                     </div>
-                  </div>
 
-                  {/* Words, QR, Terms - Visible on ALL Pages */}
-                  <div className="flex border-b border-black footer-details-area">
-                    <div className="w-1/2 border-r border-black p-2 words-block">
-                      <span className="font-bold text-[11px]">{isLastPage ? 'Total In Words' : 'Page Subtotal In Words'}</span>
-                      <div className="flex-1 flex items-center justify-center text-center px-4 mt-2">
-                        <span className="font-bold text-xs uppercase underline invoice-amount-words">{numberToWords(isLastPage ? grandTotal : Math.round(pageSubtotal))} Only</span>
+                    {/* Total In Words */}
+                    {isLastPage && (
+                      <div className="border-b border-black p-2 text-center bg-gray-50 flex flex-col justify-center min-h-[40px]">
+                        <span className="font-bold text-[10px] text-gray-500 mb-0.5">Amount in Words</span>
+                        <span className="font-bold text-xs uppercase underline invoice-amount-words leading-tight">{numberToWords(grandTotal)}</span>
                       </div>
-                      <div className="mt-4 terms-block">
-                        <div className="font-bold text-[11px] mb-1">Terms and Conditions:</div>
-                        <ul className="text-[10px] list-disc pl-4 text-black space-y-0.5 leading-tight font-medium">
-                          <li>Goods once sold cannot be taken back or exchange.</li>
-                          <li>Invoice Once made cannot be Modified or Cancelled.</li>
-                          <li>Repairs/ Replacement subject to manufacture Policy.</li>
-                          <li>Warranty void on product if Mishandled/ Burnt/ Physically.</li>
-                          <li>Credit period 2 Days only</li>
-                        </ul>
-                      </div>
-                    </div>
+                    )}
 
-                    {/* Payment QR Code */}
-                    <div className="w-1/2 p-2 flex relative qr-block">
-                      <div className="flex-1 flex flex-col font-bold">
-                        <span className="text-[10px] mb-1">Payment QR Code</span>
-                        <span className="text-[10px]">UPI ID: <span className="invoice-upi-id">{companyDetails.upiId}</span></span>
-                      </div>
-                      <div className="w-20 h-20 ml-2 border border-black p-0.5">
-                        <img src="/payment-qr.png" alt="Payment QR Code" className="w-full h-full object-contain" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Signature Section */}
-                  <div className="flex h-[110px]">
-                    <div className="w-1/2 p-2 flex items-center quote-block">
-                      <p className="text-[10px] italic text-gray-400 invoice-quote">{isLastPage ? 'Thank you for your business!' : 'Continued on next page...'}</p>
-                    </div>
-                    <div className="w-1/2 relative flex flex-col items-center justify-end p-2 px-4 h-[110px] signature-block">
-                      <div className="absolute top-2 right-2 text-[10px] font-bold">For <span className="invoice-company-name">{companyDetails.name}</span></div>
-                      <div className="flex items-center justify-center mb-4">
-                        <img src="/authorized-signature.png" alt="Authorized Signature" className="h-24 w-auto object-contain invoice-signature-img" />
+                    {/* Authorized Signature */}
+                    <div className="flex-1 relative flex flex-col items-center justify-end p-2 px-4 signature-block min-h-[80px]">
+                      <div className="absolute top-2 right-2 text-[9px] font-bold text-gray-400">For <span className="invoice-company-name text-black">{companyDetails.name}</span></div>
+                      <div className="flex items-center justify-center mb-1 flex-1">
+                        <img src={companyDetails.signature || "/authorized-signature.png"} alt="Authorized Signature" className="max-h-16 w-auto object-contain invoice-signature-img" />
                       </div>
                       <div className="text-[10px] font-bold border-t border-black w-full text-center pt-1 mt-1">Authorized Signature</div>
                     </div>
                   </div>
+                </div>
+
+                {/* Page Number - Bottom Left */}
+                <div className="absolute bottom-1 left-2 text-[9px] font-bold text-gray-400">
+                  Page {pageIndex + 1} of {chunks.length}
                 </div>
               </div>
             </div>
