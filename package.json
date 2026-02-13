@@ -45,7 +45,7 @@
     "wrangler": "^4.33.0"
   },
   "scripts": {
-    "build": "tsc -b && vite build && (if [ -d dist/client ]; then cp -rn dist/client/* dist/ && rm -rf dist/client; fi)",
+    "build": "tsc -b && vite build && node -e \"const fs = require('fs'); const path = require('path'); const clientDir = path.join('dist', 'client'); if (fs.existsSync(clientDir)) { fs.readdirSync(clientDir).forEach(file => { const src = path.join(clientDir, file); const dest = path.join('dist', file); if (!fs.existsSync(dest)) fs.renameSync(src, dest); }); fs.rmSync(clientDir, { recursive: true, force: true }); }\"",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "vite",
