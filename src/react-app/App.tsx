@@ -11,6 +11,7 @@ import Reports from "@/react-app/pages/Reports";
 import Login from "@/react-app/pages/Login";
 import ProtectedRoute from "@/react-app/components/ProtectedRoute";
 import GlobalErrorBoundary from "@/react-app/components/GlobalErrorBoundary";
+// Deployment Sync Check: 2026-02-13 17:58
 export default function App() {
   return (
     <GlobalErrorBoundary>
