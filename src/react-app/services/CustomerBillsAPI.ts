@@ -7,6 +7,8 @@
  * DO NOT use this for creating or editing bills - use BillingAPI instead.
  */
 
+import { CONFIG } from '../config';
+
 export interface CustomerBill {
     id: string;
     invoiceNumber: string;
@@ -26,7 +28,7 @@ export interface CustomerBill {
     createdBy?: string;
 }
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = CONFIG.API_BASE_URL;
 
 export const CustomerBillsAPI = {
     /**

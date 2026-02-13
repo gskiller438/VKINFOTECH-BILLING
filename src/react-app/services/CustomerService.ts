@@ -1,4 +1,5 @@
 import { authService } from './AuthService';
+import { CONFIG } from '../config';
 
 export interface Customer {
     id: string;
@@ -19,7 +20,7 @@ export interface Customer {
 }
 
 class CustomerService {
-    private API_URL = 'http://localhost:5000/api/customers';
+    private API_URL = `${CONFIG.API_BASE_URL}/customers`;
 
     async getAllCustomers(): Promise<Customer[]> {
         try {

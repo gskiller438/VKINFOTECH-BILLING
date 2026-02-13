@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 
 export interface User {
     id: string;
@@ -9,7 +10,7 @@ export interface User {
 
 class AuthService {
     private USER_KEY = 'user';
-    private API_URL = 'http://localhost:5000/api/auth';
+    private API_URL = `${CONFIG.API_BASE_URL}/auth`;
 
     async login(username: string, password: string): Promise<User | null> {
         try {

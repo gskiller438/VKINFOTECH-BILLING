@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Save, Trash2, Printer, Edit } from 'lucide-react';
 
+import { authService } from '../services/AuthService';
 import { handlePrintInvoice, generateInvoicePDF } from '../components/invoice/InvoicePrintHandler';
 import { CompanyDetails, InvoiceData } from '../types';
 import { productService, Product as InventoryProduct } from '../services/ProductService';
@@ -58,9 +59,10 @@ export default function Billing() {
 
   // Company Details State (Load from localStorage or use defaults)
   const [companyDetails] = useState<CompanyDetails>(() => {
+    const user = authService.getCurrentUser();
     const savedDetails = localStorage.getItem('companySettings');
-    return savedDetails ? JSON.parse(savedDetails) : {
-      name: 'VK INFOTECH',
+    const defaults = {
+      name: user?.branch || 'VK INFOTECH',
       tagline: 'Complete Technology Solution Provider',
       address: 'No.1, Kumaravel Complex, Koneripatti, Rasipuram, Namakkal - 637408',
       mobile: '+91 99445 51256',
@@ -74,6 +76,7 @@ export default function Billing() {
       email: 'vkinfotech.vk@gmail.com',
       logo: '/invoice-logo.png'
     };
+    return savedDetails ? JSON.parse(savedDetails) : defaults;
   });
 
   // Bill From Editable State
@@ -602,7 +605,7 @@ export default function Billing() {
 
                   {/* TITLE BOX */}
                   <div className="flex-1 flex flex-col items-center justify-center">
-                    <h1 className="text-4xl font-bold text-[#22c55e] tracking-wider company-name-font">VK INFOTECH</h1>
+                    <h1 className="text-4xl font-bold text-[#22c55e] tracking-wider company-name-font uppercase">{billFromName}</h1>
                     <p className="text-xs font-bold mt-1" style={{ fontFamily: 'ZyanaRegular, serif' }}>Complete Technology Solution Provider</p>
                   </div>
 

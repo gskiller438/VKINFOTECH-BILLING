@@ -1,4 +1,5 @@
 import { authService } from './AuthService';
+import { CONFIG } from '../config';
 
 export interface Product {
     id: string;
@@ -21,7 +22,7 @@ export interface Product {
 }
 
 class ProductService {
-    private API_URL = 'http://localhost:5000/api/products';
+    private API_URL = `${CONFIG.API_BASE_URL}/products`;
 
     async getAllProducts(): Promise<Product[]> {
         try {

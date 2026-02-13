@@ -1,7 +1,8 @@
 import { InvoiceData } from '../types';
 import { authService } from './AuthService';
+import { CONFIG } from '../config';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export const BillingAPI = {
     generateWordInvoice: async (data: InvoiceData) => {

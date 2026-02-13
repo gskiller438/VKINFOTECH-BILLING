@@ -1,4 +1,5 @@
 import { authService } from './AuthService';
+import { CONFIG } from '../config';
 
 export interface StockLog {
     id: string;
@@ -16,7 +17,7 @@ export interface StockLog {
 }
 
 class StockService {
-    private API_URL = 'http://localhost:5000/api/stock-logs';
+    private API_URL = `${CONFIG.API_BASE_URL}/stock-logs`;
 
     async getAllLogs(): Promise<StockLog[]> {
         try {

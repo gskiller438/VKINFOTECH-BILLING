@@ -95,7 +95,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
               <div className="flex flex-col animate-in fade-in slide-in-from-left duration-500">
-                <h1 className="text-2xl font-bold text-green-400 bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent company-name-font">VK INFOTECH</h1>
+                <h1 className="text-2xl font-bold text-green-400 bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent company-name-font">{user?.branch || 'VK INFOTECH'}</h1>
               </div>
             )}
             <button
@@ -159,7 +159,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="w-14 h-14 rounded-full p-2 flex items-center justify-center">
                 <img src="/vk-logo.png" alt="VK Logo" className="w-full h-full object-contain" />
               </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent company-name-font">VK INFOTECH</h1>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent company-name-font">{user?.branch || 'VK INFOTECH'}</h1>
             </div>
 
             {/* Right Side - Profile */}
